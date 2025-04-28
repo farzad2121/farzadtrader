@@ -1,0 +1,1797 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سیستم پیشرفته آنالیز تریدهای فارکس با اتصال به بروکر</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <style>
+        @font-face {
+            font-family: 'Vazir';
+            src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+        }
+        body {
+            font-family: 'Vazir', sans-serif;
+            background-color: #f0f3f9;
+        }
+        .rtl {
+            direction: rtl;
+        }
+        .dashboard-card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        }
+        .chart-container {
+            height: 300px;
+            margin-bottom: 20px;
+        }
+        .tab {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .tab.active {
+            border-bottom: 3px solid #3b82f6;
+            color: #3b82f6;
+        }
+        .broker-icon {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        @media print {
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+    <!-- Header -->
+    <header class="gradient-bg text-white p-4">
+        <div class="container mx-auto flex flex-col md:flex-row justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold">سیستم پیشرفته آنالیز تریدهای فارکس</h1>
+                <p class="text-sm opacity-80">آنالیز، بهینه‌سازی و بهبود عملکرد معاملاتی شما</p>
+            </div>
+            <div class="mt-3 md:mt-0">
+                <div id="connection-status" class="px-4 py-2 bg-red-500 rounded-full text-sm flex items-center">
+                    <i class="fas fa-plug ml-2"></i>
+                    <span>غیر متصل</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="bg-white shadow-sm sticky top-0 z-10 no-print">
+        <div class="container mx-auto">
+            <div class="flex overflow-x-auto">
+                <div class="tab active px-6 py-4 font-medium" data-tab="dashboard">داشبورد</div>
+                <div class="tab px-6 py-4 font-medium" data-tab="trades">تریدها</div>
+                <div class="tab px-6 py-4 font-medium" data-tab="analytics">تحلیل‌های پیشرفته</div>
+                <div class="tab px-6 py-4 font-medium" data-tab="recommendations">پیشنهادات</div>
+                <div class="tab px-6 py-4 font-medium" data-tab="settings">تنظیمات</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="container mx-auto py-8 px-4">
+        <!-- Broker Connection Section -->
+        <section id="broker-connection" class="mb-8 p-6 bg-white rounded-lg shadow-md">
+            <h2 class="text-xl font-bold mb-4">اتصال به بروکر</h2>
+            <p class="mb-4 text-gray-600">اطلاعات حساب بروکر خود را وارد کنید تا تریدهای شما به صورت خودکار وارد شوند.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <form id="broker-form" class="space-y-4">
+                        <div>
+                            <label class="block text-gray-700 mb-2">بروکر</label>
+                            <select id="broker-name" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">انتخاب بروکر</option>
+                                <option value="MetaTrader4">MetaTrader 4</option>
+                                <option value="MetaTrader5">MetaTrader 5</option>
+                                <option value="cTrader">cTrader</option>
+                                <option value="FXCM">FXCM</option>
+                                <option value="other">سایر</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 mb-2">شماره حساب</label>
+                            <input type="text" id="account-number" placeholder="مثال: 12345678" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 mb-2">
+                                رمز عبور اینوستور یا کلید API
+                                <span class="tooltip text-sm text-blue-500">
+                                    <i class="fas fa-info-circle"></i>
+                                    <span class="tooltiptext">رمز عبور اینوستور رمز عبوری است که دسترسی فقط-خواندنی به حساب شما می‌دهد و امن است.</span>
+                                </span>
+                            </label>
+                            <input type="password" id="investor-password" placeholder="رمز عبور اینوستور یا کلید API را وارد کنید" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 mb-2">نشانی سرور (اختیاری)</label>
+                            <input type="text" id="server-address" placeholder="مثال: server.broker.com" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <button type="button" id="connect-broker" class="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-300 flex items-center justify-center">
+                            <i class="fas fa-link ml-2"></i>
+                            اتصال به بروکر
+                        </button>
+                    </form>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">بروکرهای پشتیبانی شده</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="p-4 border rounded-lg flex items-center">
+                            <img src="https://cdn.jsdelivr.net/gh/MetaQuotes/icons@master/mt4/icon.svg" alt="MetaTrader 4" class="broker-icon ml-3">
+                            <span>MetaTrader 4</span>
+                        </div>
+                        <div class="p-4 border rounded-lg flex items-center">
+                            <img src="https://cdn.jsdelivr.net/gh/MetaQuotes/icons@master/mt5/icon.svg" alt="MetaTrader 5" class="broker-icon ml-3">
+                            <span>MetaTrader 5</span>
+                        </div>
+                        <div class="p-4 border rounded-lg flex items-center">
+                            <img src="https://cdn.jsdelivr.net/gh/spotware/cTrader-icons/ctrader.svg" alt="cTrader" class="broker-icon ml-3">
+                            <span>cTrader</span>
+                        </div>
+                        <div class="p-4 border rounded-lg flex items-center">
+                            <i class="fas fa-exchange-alt text-blue-500 text-2xl ml-3"></i>
+                            <span>FXCM</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <h4 class="font-semibold text-blue-800 mb-2">مزایای اتصال خودکار به بروکر</h4>
+                        <ul class="list-disc list-inside text-sm text-blue-700 space-y-1">
+                            <li>ورود خودکار تمام تریدها بدون نیاز به ثبت دستی</li>
+                            <li>اطلاعات دقیق و بدون خطای انسانی</li>
+                            <li>به‌روزرسانی آنی داشبورد با انجام هر معامله</li>
+                            <li>امکان دسترسی به تاریخچه کامل معاملات گذشته</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Section -->
+        <section id="tab-dashboard" class="tab-content">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Total Profit Card -->
+                <div class="dashboard-card bg-white p-6">
+                    <h3 class="text-gray-500 text-sm">سود/ضرر کل</h3>
+                    <div class="flex items-center justify-between mt-2">
+                        <span class="text-2xl font-bold text-green-600">$2,345.78</span>
+                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">+15.4%</span>
+                    </div>
+                    <div class="mt-4 text-sm text-gray-500">نسبت به ماه گذشته</div>
+                </div>
+                
+                <!-- Win Rate Card -->
+                <div class="dashboard-card bg-white p-6">
+                    <h3 class="text-gray-500 text-sm">نسبت برد</h3>
+                    <div class="flex items-center justify-between mt-2">
+                        <span class="text-2xl font-bold">63%</span>
+                        <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">87 از 138</span>
+                    </div>
+                    <div class="mt-4 text-sm text-gray-500">معاملات سودده</div>
+                </div>
+                
+                <!-- Average Trade Card -->
+                <div class="dashboard-card bg-white p-6">
+                    <h3 class="text-gray-500 text-sm">میانگین سود هر معامله</h3>
+                    <div class="flex items-center justify-between mt-2">
+                        <span class="text-2xl font-bold">$35.42</span>
+                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">+5.2%</span>
+                    </div>
+                    <div class="mt-4 text-sm text-gray-500">نسبت به میانگین کلی</div>
+                </div>
+                
+                <!-- Risk-Reward Card -->
+                <div class="dashboard-card bg-white p-6">
+                    <h3 class="text-gray-500 text-sm">نسبت ریسک به پاداش</h3>
+                    <div class="flex items-center justify-between mt-2">
+                        <span class="text-2xl font-bold">1:2.3</span>
+                        <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-sm">در حد متوسط</span>
+                    </div>
+                    <div class="mt-4 text-sm text-gray-500">هدف: 1:3</div>
+                </div>
+            </div>
+            
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
+                <!-- Profit Chart -->
+                <div class="dashboard-card bg-white p-6">
+                    <h3 class="text-gray-700 font-semibold mb-4">روند سود/ضرر</h3>
+                    <div class="chart-container">
+                        <canvas id="profit-chart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Time Performance Chart -->
+                <div class="dashboard-card bg-white p-6">
+                    <h3 class="text-gray-700 font-semibold mb-4">عملکرد در ساعات مختلف روز</h3>
+                    <div class="chart-container">
+                        <canvas id="time-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional Charts Row -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
+                <!-- Currency Pairs Performance -->
+                <div class="dashboard-card bg-white p-6">
+                    <h3 class="text-gray-700 font-semibold mb-4">عملکرد جفت ارزها</h3>
+                    <div class="chart-container">
+                        <canvas id="currency-chart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Strategy Performance -->
+                <div class="dashboard-card bg-white p-6">
+                    <h3 class="text-gray-700 font-semibold mb-4">عملکرد استراتژی‌ها</h3>
+                    <div class="chart-container">
+                        <canvas id="strategy-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Trades Table -->
+            <div class="dashboard-card bg-white p-6 my-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-gray-700 font-semibold">آخرین معاملات</h3>
+                    <button class="text-blue-600 hover:underline text-sm" id="view-all-trades">مشاهده همه</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 text-sm leading-normal">
+                                <th class="py-3 px-4 text-right">تاریخ</th>
+                                <th class="py-3 px-4 text-right">جفت ارز</th>
+                                <th class="py-3 px-4 text-right">نوع</th>
+                                <th class="py-3 px-4 text-right">حجم</th>
+                                <th class="py-3 px-4 text-right">قیمت ورود</th>
+                                <th class="py-3 px-4 text-right">قیمت خروج</th>
+                                <th class="py-3 px-4 text-right">سود/ضرر</th>
+                                <th class="py-3 px-4 text-right">استراتژی</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-600 text-sm">
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-3 px-4">1402/06/12 14:30</td>
+                                <td class="py-3 px-4">EUR/USD</td>
+                                <td class="py-3 px-4"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full">خرید</span></td>
+                                <td class="py-3 px-4">0.15</td>
+                                <td class="py-3 px-4">1.0845</td>
+                                <td class="py-3 px-4">1.0872</td>
+                                <td class="py-3 px-4 text-green-600">+$40.50</td>
+                                <td class="py-3 px-4">شکست خط روند</td>
+                            </tr>
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-3 px-4">1402/06/12 10:15</td>
+                                <td class="py-3 px-4">GBP/JPY</td>
+                                <td class="py-3 px-4"><span class="px-2 py-1 bg-red-100 text-red-800 rounded-full">فروش</span></td>
+                                <td class="py-3 px-4">0.20</td>
+                                <td class="py-3 px-4">182.54</td>
+                                <td class="py-3 px-4">182.10</td>
+                                <td class="py-3 px-4 text-green-600">+$88.00</td>
+                                <td class="py-3 px-4">واگرایی RSI</td>
+                            </tr>
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-3 px-4">1402/06/11 16:45</td>
+                                <td class="py-3 px-4">USD/JPY</td>
+                                <td class="py-3 px-4"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full">خرید</span></td>
+                                <td class="py-3 px-4">0.10</td>
+                                <td class="py-3 px-4">146.78</td>
+                                <td class="py-3 px-4">146.52</td>
+                                <td class="py-3 px-4 text-red-600">-$26.00</td>
+                                <td class="py-3 px-4">الگوی هارمونیک</td>
+                            </tr>
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-3 px-4">1402/06/11 09:20</td>
+                                <td class="py-3 px-4">AUD/USD</td>
+                                <td class="py-3 px-4"><span class="px-2 py-1 bg-red-100 text-red-800 rounded-full">فروش</span></td>
+                                <td class="py-3 px-4">0.25</td>
+                                <td class="py-3 px-4">0.6512</td>
+                                <td class="py-3 px-4">0.6490</td>
+                                <td class="py-3 px-4 text-green-600">+$55.00</td>
+                                <td class="py-3 px-4">شکست خط حمایت</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="py-3 px-4">1402/06/10 12:35</td>
+                                <td class="py-3 px-4">EUR/GBP</td>
+                                <td class="py-3 px-4"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full">خرید</span></td>
+                                <td class="py-3 px-4">0.15</td>
+                                <td class="py-3 px-4">0.8562</td>
+                                <td class="py-3 px-4">0.8580</td>
+                                <td class="py-3 px-4 text-green-600">+$27.00</td>
+                                <td class="py-3 px-4">میانگین متحرک</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Trades Section -->
+        <section id="tab-trades" class="tab-content hidden">
+            <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+                    <h2 class="text-xl font-bold">تمام معاملات</h2>
+                    <div class="flex flex-col sm:flex-row gap-2 mt-3 md:mt-0">
+                        <button id="add-manual-trade" class="py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-300 flex items-center">
+                            <i class="fas fa-plus ml-2"></i>
+                            افزودن معامله دستی
+                        </button>
+                        <button id="import-trades" class="py-2 px-4 bg-gray-600 text-white rounded hover:bg-gray-700 transition duration-300 flex items-center">
+                            <i class="fas fa-file-import ml-2"></i>
+                            وارد کردن از فایل
+                        </button>
+                        <button id="export-trades" class="py-2 px-4 bg-green-600 text-white rounded hover:bg-green-700 transition duration-300 flex items-center">
+                            <i class="fas fa-file-export ml-2"></i>
+                            خروجی گرفتن
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Filters -->
+                <div class="mb-6">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div class="w-full md:w-auto">
+                            <label class="block text-gray-700 text-sm mb-1">جفت ارز</label>
+                            <select class="p-2 border border-gray-300 rounded w-full md:w-auto">
+                                <option value="">همه</option>
+                                <option>EUR/USD</option>
+                                <option>GBP/USD</option>
+                                <option>USD/JPY</option>
+                                <option>AUD/USD</option>
+                                <option>USD/CAD</option>
+                            </select>
+                        </div>
+                        
+                        <div class="w-full md:w-auto">
+                            <label class="block text-gray-700 text-sm mb-1">نوع معامله</label>
+                            <select class="p-2 border border-gray-300 rounded w-full md:w-auto">
+                                <option value="">همه</option>
+                                <option>خرید</option>
+                                <option>فروش</option>
+                            </select>
+                        </div>
+                        
+                        <div class="w-full md:w-auto">
+                            <label class="block text-gray-700 text-sm mb-1">نتیجه</label>
+                            <select class="p-2 border border-gray-300 rounded w-full md:w-auto">
+                                <option value="">همه</option>
+                                <option>سودده</option>
+                                <option>ضررده</option>
+                            </select>
+                        </div>
+                        
+                        <div class="w-full md:w-auto">
+                            <label class="block text-gray-700 text-sm mb-1">از تاریخ</label>
+                            <input type="date" class="p-2 border border-gray-300 rounded w-full md:w-auto">
+                        </div>
+                        
+                        <div class="w-full md:w-auto">
+                            <label class="block text-gray-700 text-sm mb-1">تا تاریخ</label>
+                            <input type="date" class="p-2 border border-gray-300 rounded w-full md:w-auto">
+                        </div>
+                        
+                        <div class="w-full md:w-auto mt-4 md:mt-0 md:self-end">
+                            <button class="py-2 px-4 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition duration-300">
+                                <i class="fas fa-filter ml-1"></i>
+                                اعمال فیلتر
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Trades Table -->
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 text-sm leading-normal">
+                                <th class="py-3 px-4 text-right">#</th>
+                                <th class="py-3 px-4 text-right">تاریخ و زمان</th>
+                                <th class="py-3 px-4 text-right">جفت ارز</th>
+                                <th class="py-3 px-4 text-right">نوع</th>
+                                <th class="py-3 px-4 text-right">حجم</th>
+                                <th class="py-3 px-4 text-right">قیمت ورود</th>
+                                <th class="py-3 px-4 text-right">قیمت خروج</th>
+                                <th class="py-3 px-4 text-right">سود/ضرر</th>
+                                <th class="py-3 px-4 text-right">استراتژی</th>
+                                <th class="py-3 px-4 text-right">عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-600 text-sm">
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-3 px-4">1</td>
+                                <td class="py-3 px-4">1402/06/12 14:30</td>
+                                <td class="py-3 px-4">EUR/USD</td>
+                                <td class="py-3 px-4"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full">خرید</span></td>
+                                <td class="py-3 px-4">0.15</td>
+                                <td class="py-3 px-4">1.0845</td>
+                                <td class="py-3 px-4">1.0872</td>
+                                <td class="py-3 px-4 text-green-600">+$40.50</td>
+                                <td class="py-3 px-4">شکست خط روند</td>
+                                <td class="py-3 px-4">
+                                    <div class="flex items-center space-x-2 space-x-reverse">
+                                        <button class="text-blue-500 hover:text-blue-700">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-red-500 hover:text-red-700">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        <button class="text-gray-500 hover:text-gray-700">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-3 px-4">2</td>
+                                <td class="py-3 px-4">1402/06/12 10:15</td>
+                                <td class="py-3 px-4">GBP/JPY</td>
+                                <td class="py-3 px-4"><span class="px-2 py-1 bg-red-100 text-red-800 rounded-full">فروش</span></td>
+                                <td class="py-3 px-4">0.20</td>
+                                <td class="py-3 px-4">182.54</td>
+                                <td class="py-3 px-4">182.10</td>
+                                <td class="py-3 px-4 text-green-600">+$88.00</td>
+                                <td class="py-3 px-4">واگرایی RSI</td>
+                                <td class="py-3 px-4">
+                                    <div class="flex items-center space-x-2 space-x-reverse">
+                                        <button class="text-blue-500 hover:text-blue-700">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-red-500 hover:text-red-700">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        <button class="text-gray-500 hover:text-gray-700">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-3 px-4">3</td>
+                                <td class="py-3 px-4">1402/06/11 16:45</td>
+                                <td class="py-3 px-4">USD/JPY</td>
+                                <td class="py-3 px-4"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full">خرید</span></td>
+                                <td class="py-3 px-4">0.10</td>
+                                <td class="py-3 px-4">146.78</td>
+                                <td class="py-3 px-4">146.52</td>
+                                <td class="py-3 px-4 text-red-600">-$26.00</td>
+                                <td class="py-3 px-4">الگوی هارمونیک</td>
+                                <td class="py-3 px-4">
+                                    <div class="flex items-center space-x-2 space-x-reverse">
+                                        <button class="text-blue-500 hover:text-blue-700">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-red-500 hover:text-red-700">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        <button class="text-gray-500 hover:text-gray-700">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-3 px-4">4</td>
+                                <td class="py-3 px-4">1402/06/11 09:20</td>
+                                <td class="py-3 px-4">AUD/USD</td>
+                                <td class="py-3 px-4"><span class="px-2 py-1 bg-red-100 text-red-800 rounded-full">فروش</span></td>
+                                <td class="py-3 px-4">0.25</td>
+                                <td class="py-3 px-4">0.6512</td>
+                                <td class="py-3 px-4">0.6490</td>
+                                <td class="py-3 px-4 text-green-600">+$55.00</td>
+                                <td class="py-3 px-4">شکست خط حمایت</td>
+                                <td class="py-3 px-4">
+                                    <div class="flex items-center space-x-2 space-x-reverse">
+                                        <button class="text-blue-500 hover:text-blue-700">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-red-500 hover:text-red-700">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        <button class="text-gray-500 hover:text-gray-700">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-3 px-4">5</td>
+                                <td class="py-3 px-4">1402/06/10 12:35</td>
+                                <td class="py-3 px-4">EUR/GBP</td>
+                                <td class="py-3 px-4"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full">خرید</span></td>
+                                <td class="py-3 px-4">0.15</td>
+                                <td class="py-3 px-4">0.8562</td>
+                                <td class="py-3 px-4">0.8580</td>
+                                <td class="py-3 px-4 text-green-600">+$27.00</td>
+                                <td class="py-3 px-4">میانگین متحرک</td>
+                                <td class="py-3 px-4">
+                                    <div class="flex items-center space-x-2 space-x-reverse">
+                                        <button class="text-blue-500 hover:text-blue-700">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-red-500 hover:text-red-700">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        <button class="text-gray-500 hover:text-gray-700">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-3 px-4">6</td>
+                                <td class="py-3 px-4">1402/06/10 09:45</td>
+                                <td class="py-3 px-4">USD/CAD</td>
+                                <td class="py-3 px-4"><span class="px-2 py-1 bg-red-100 text-red-800 rounded-full">فروش</span></td>
+                                <td class="py-3 px-4">0.30</td>
+                                <td class="py-3 px-4">1.3624</td>
+                                <td class="py-3 px-4">1.3650</td>
+                                <td class="py-3 px-4 text-red-600">-$78.00</td>
+                                <td class="py-3 px-4">شکست کانال قیمت</td>
+                                <td class="py-3 px-4">
+                                    <div class="flex items-center space-x-2 space-x-reverse">
+                                        <button class="text-blue-500 hover:text-blue-700">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-red-500 hover:text-red-700">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        <button class="text-gray-500 hover:text-gray-700">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-3 px-4">7</td>
+                                <td class="py-3 px-4">1402/06/09 15:20</td>
+                                <td class="py-3 px-4">EUR/USD</td>
+                                <td class="py-3 px-4"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full">خرید</span></td>
+                                <td class="py-3 px-4">0.20</td>
+                                <td class="py-3 px-4">1.0820</td>
+                                <td class="py-3 px-4">1.0835</td>
+                                <td class="py-3 px-4 text-green-600">+$30.00</td>
+                                <td class="py-3 px-4">خبر اقتصادی</td>
+                                <td class="py-3 px-4">
+                                    <div class="flex items-center space-x-2 space-x-reverse">
+                                        <button class="text-blue-500 hover:text-blue-700">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-red-500 hover:text-red-700">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        <button class="text-gray-500 hover:text-gray-700">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                <div class="flex justify-between items-center mt-4">
+                    <div class="text-sm text-gray-600">
+                        نمایش 1 تا 7 از 138 مورد
+                    </div>
+                    <div class="flex space-x-1 space-x-reverse">
+                        <button class="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                            قبلی
+                        </button>
+                        <button class="px-3 py-1 rounded border border-blue-500 bg-blue-500 text-white">
+                            1
+                        </button>
+                        <button class="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                            2
+                        </button>
+                        <button class="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                            3
+                        </button>
+                        <button class="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                            ...
+                        </button>
+                        <button class="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                            20
+                        </button>
+                        <button class="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                            بعدی
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Analytics Section -->
+        <section id="tab-analytics" class="tab-content hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Time Analysis -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-bold mb-4">تحلیل عملکرد براساس زمان</h2>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold mb-3">بهترین ساعات معاملاتی شما</h3>
+                        <div class="chart-container">
+                            <canvas id="best-hours-chart"></canvas>
+                        </div>
+                        <div class="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                            <h4 class="font-semibold text-green-800 mb-2">پیشنهادات برای بهبود:</h4>
+                            <ul class="list-disc list-inside text-sm text-green-700 space-y-1">
+                                <li>بهترین عملکرد شما بین ساعات 10:00 تا 12:00 و 14:00 تا 16:00 است.</li>
+                                <li>سعی کنید معاملات مهم خود را در این بازه‌های زمانی انجام دهید.</li>
+                                <li>از معامله در ساعات 20:00 تا 22:00 که بدترین عملکرد را داشته‌اید، خودداری کنید.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-lg font-semibold mb-3">عملکرد براساس روزهای هفته</h3>
+                        <div class="chart-container">
+                            <canvas id="weekday-chart"></canvas>
+                        </div>
+                        <div class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <h4 class="font-semibold text-blue-800 mb-2">تحلیل روند:</h4>
+                            <ul class="list-disc list-inside text-sm text-blue-700 space-y-1">
+                                <li>بهترین روزهای معاملاتی شما سه‌شنبه و چهارشنبه هستند.</li>
+                                <li>دوشنبه‌ها معمولاً عملکرد متوسطی دارید.</li>
+                                <li>جمعه‌ها بدترین روز معاملاتی شما بوده است.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Strategy Analysis -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-bold mb-4">تحلیل استراتژی‌های معاملاتی</h2>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold mb-3">کارایی استراتژی‌های مختلف</h3>
+                        <div class="chart-container">
+                            <canvas id="strategy-performance-chart"></canvas>
+                        </div>
+                        <div class="mt-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                            <h4 class="font-semibold text-indigo-800 mb-2">بینش‌های کلیدی:</h4>
+                            <ul class="list-disc list-inside text-sm text-indigo-700 space-y-1">
+                                <li>روش «شکست خط روند» با 78% نرخ موفقیت بهترین استراتژی شما بوده است.</li>
+                                <li>استراتژی «واگرایی RSI» با میانگین سود 45 دلار در هر معامله بیشترین سود را داشته است.</li>
+                                <li>استراتژی «الگوی هارمونیک» با نرخ موفقیت 42% نیاز به بازنگری دارد.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-lg font-semibold mb-3">مقایسه روش‌های ورود</h3>
+                        <div class="chart-container">
+                            <canvas id="entry-methods-chart"></canvas>
+                        </div>
+                        <div class="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                            <h4 class="font-semibold text-purple-800 mb-2">توصیه‌های بهبود:</h4>
+                            <ul class="list-disc list-inside text-sm text-purple-700 space-y-1">
+                                <li>استفاده از «شکست سطوح کلیدی» همراه با تأیید اندیکاتورها نتایج بهتری داشته است.</li>
+                                <li>ورود در «خطوط حمایت/مقاومت» با حجم کمتر ریسک پایین‌تری دارد.</li>
+                                <li>روش «ورود در برگشت قیمت» نیاز به اصلاح و تمرین بیشتر دارد.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <!-- Currency Pair Analysis -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-bold mb-4">تحلیل جفت ارزها</h2>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold mb-3">سودآوری براساس جفت ارز</h3>
+                        <div class="chart-container">
+                            <canvas id="currency-profit-chart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-4 bg-blue-50 rounded-lg">
+                            <h4 class="font-semibold text-blue-800 mb-2">بهترین جفت ارزها</h4>
+                            <ol class="list-decimal list-inside text-sm text-blue-700 space-y-1">
+                                <li>GBP/JPY - سود میانگین: $65.20 / معامله</li>
+                                <li>EUR/USD - سود میانگین: $42.80 / معامله</li>
+                                <li>AUD/USD - سود میانگین: $38.50 / معامله</li>
+                            </ol>
+                        </div>
+                        
+                        <div class="p-4 bg-red-50 rounded-lg">
+                            <h4 class="font-semibold text-red-800 mb-2">بدترین جفت ارزها</h4>
+                            <ol class="list-decimal list-inside text-sm text-red-700 space-y-1">
+                                <li>USD/CAD - ضرر میانگین: -$28.40 / معامله</li>
+                                <li>USD/CHF - ضرر میانگین: -$22.30 / معامله</li>
+                                <li>NZD/USD - ضرر میانگین: -$18.70 / معامله</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Risk Management Analysis -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-bold mb-4">تحلیل مدیریت ریسک</h2>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold mb-3">نسبت ریسک به پاداش</h3>
+                        <div class="chart-container">
+                            <canvas id="risk-reward-chart"></canvas>
+                        </div>
+                        <div class="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <h4 class="font-semibold text-yellow-800 mb-2">توصیه‌های مدیریت ریسک:</h4>
+                            <ul class="list-disc list-inside text-sm text-yellow-700 space-y-1">
+                                <li>میانگین نسبت ریسک به پاداش شما 1:2.3 است که در حد متوسط است.</li>
+                                <li>سعی کنید این نسبت را به حداقل 1:3 افزایش دهید.</li>
+                                <li>معاملات با نسبت ریسک به پاداش بالاتر از 1:4 سودآورترین معاملات شما بوده‌اند.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-lg font-semibold mb-3">تأثیر حجم معاملات بر عملکرد</h3>
+                        <div class="chart-container">
+                            <canvas id="volume-performance-chart"></canvas>
+                        </div>
+                        <div class="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                            <h4 class="font-semibold text-green-800 mb-2">بینش‌های مدیریت سرمایه:</h4>
+                            <ul class="list-disc list-inside text-sm text-green-700 space-y-1">
+                                <li>معاملات با حجم 0.15 تا 0.25 بهترین تعادل ریسک و بازده را داشته‌اند.</li>
+                                <li>معاملات با حجم بالاتر از 0.5 اغلب منجر به ضررهای بزرگ شده‌اند.</li>
+                                <li>برای مدیریت بهتر ریسک، حجم معاملات را به 2% سرمایه محدود کنید.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow-md mt-6">
+                <h2 class="text-xl font-bold mb-4">تحلیل پیشرفته معاملات</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Winning Streak Analysis -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-3">تحلیل توالی معاملات</h3>
+                        <div class="p-4 bg-white border border-gray-200 rounded-lg">
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-gray-600">بیشترین توالی برد:</span>
+                                <span class="font-semibold text-green-600">8 معامله</span>
+                            </div>
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-gray-600">بیشترین توالی باخت:</span>
+                                <span class="font-semibold text-red-600">4 معامله</span>
+                            </div>
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-gray-600">میانگین توالی برد:</span>
+                                <span class="font-semibold text-blue-600">3.2 معامله</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-600">میانگین توالی باخت:</span>
+                                <span class="font-semibold text-orange-600">1.8 معامله</span>
+                            </div>
+                        </div>
+                        <div class="mt-4 p-4 bg-blue-50 rounded-lg">
+                            <h4 class="font-semibold text-blue-800 mb-2">توصیه‌ها:</h4>
+                            <ul class="list-disc list-inside text-sm text-blue-700 space-y-1">
+                                <li>هنگام توالی بردها، حجم معاملات را به تدریج افزایش دهید.</li>
+                                <li>پس از 2 باخت متوالی، حجم معاملات را کاهش دهید.</li>
+                                <li>پس از 3 باخت متوالی، استراحت کوتاهی کنید و استراتژی خود را بازبینی کنید.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Psychological Analysis -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-3">تحلیل روانشناسی معاملات</h3>
+                        <div class="p-4 bg-white border border-gray-200 rounded-lg">
+                            <div class="mb-4">
+                                <span class="block text-gray-600 mb-1">واکنش به ضرر:</span>
+                                <div class="w-full bg-gray-200 rounded-full h-4">
+                                    <div class="bg-orange-500 h-4 rounded-full" style="width: 65%"></div>
+                                </div>
+                                <span class="text-sm text-gray-500 mt-1 block">65% - نیاز به بهبود</span>
+                            </div>
+                            <div class="mb-4">
+                                <span class="block text-gray-600 mb-1">مدیریت احساسات:</span>
+                                <div class="w-full bg-gray-200 rounded-full h-4">
+                                    <div class="bg-blue-500 h-4 rounded-full" style="width: 72%"></div>
+                                </div>
+                                <span class="text-sm text-gray-500 mt-1 block">72% - متوسط</span>
+                            </div>
+                            <div>
+                                <span class="block text-gray-600 mb-1">پایبندی به استراتژی:</span>
+                                <div class="w-full bg-gray-200 rounded-full h-4">
+                                    <div class="bg-green-500 h-4 rounded-full" style="width: 85%"></div>
+                                </div>
+                                <span class="text-sm text-gray-500 mt-1 block">85% - خوب</span>
+                            </div>
+                        </div>
+                        <div class="mt-4 p-4 bg-purple-50 rounded-lg">
+                            <h4 class="font-semibold text-purple-800 mb-2">توصیه‌های روانشناسی:</h4>
+                            <ul class="list-disc list-inside text-sm text-purple-700 space-y-1">
+                                <li>روی بهبود واکنش‌های خود پس از ضرر تمرکز کنید.</li>
+                                <li>از ثبت معاملات پس از ضررهای بزرگ خودداری کنید.</li>
+                                <li>زمان‌های استراحت مشخصی در طول روز معاملاتی تعیین کنید.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Market Conditions Analysis -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-3">تحلیل شرایط بازار</h3>
+                        <div class="p-4 bg-white border border-gray-200 rounded-lg">
+                            <div class="chart-container" style="height: 200px;">
+                                <canvas id="market-conditions-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="mt-4 p-4 bg-indigo-50 rounded-lg">
+                            <h4 class="font-semibold text-indigo-800 mb-2">تحلیل شرایط بازار:</h4>
+                            <ul class="list-disc list-inside text-sm text-indigo-700 space-y-1">
+                                <li>عملکرد شما در بازارهای روندی (73% موفقیت) بهتر از بازارهای محدوده‌ای (54%) است.</li>
+                                <li>در شرایط نوسانی شدید، نرخ موفقیت به 42% کاهش می‌یابد.</li>
+                                <li>در زمان انتشار اخبار مهم اقتصادی، از معامله خودداری کنید.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Recommendations Section -->
+        <section id="tab-recommendations" class="tab-content hidden">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-bold mb-6">پیشنهادات هوشمند برای بهبود معاملات</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <!-- Performance Summary -->
+                    <div class="p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+                        <div class="text-center mb-4">
+                            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 text-blue-500 mb-3">
+                                <i class="fas fa-chart-line text-2xl"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-blue-800">خلاصه عملکرد</h3>
+                        </div>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">نرخ موفقیت:</span>
+                                <span class="font-semibold">63%</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">میانگین سود:</span>
+                                <span class="font-semibold text-green-600">$35.42</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">میانگین ضرر:</span>
+                                <span class="font-semibold text-red-600">-$22.18</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">ریسک به پاداش:</span>
+                                <span class="font-semibold">1:2.3</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Strength Areas -->
+                    <div class="p-5 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-100">
+                        <div class="text-center mb-4">
+                            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-500 mb-3">
+                                <i class="fas fa-award text-2xl"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-green-800">نقاط قوت شما</h3>
+                        </div>
+                        <ul class="space-y-2 text-green-700">
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle mt-1 ml-2"></i>
+                                <span>عملکرد عالی در معاملات EUR/USD و GBP/JPY</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle mt-1 ml-2"></i>
+                                <span>استراتژی شکست خط روند با 78% موفقیت</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle mt-1 ml-2"></i>
+                                <span>پایبندی بالا به استراتژی‌های معاملاتی</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle mt-1 ml-2"></i>
+                                <span>عملکرد خوب در ساعات 10:00 تا 12:00</span>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Improvement Areas -->
+                    <div class="p-5 bg-gradient-to-br from-amber-50 to-yellow-50 rounded-lg border border-amber-100">
+                        <div class="text-center mb-4">
+                            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-100 text-amber-500 mb-3">
+                                <i class="fas fa-tools text-2xl"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-amber-800">نیازمند بهبود</h3>
+                        </div>
+                        <ul class="space-y-2 text-amber-700">
+                            <li class="flex items-start">
+                                <i class="fas fa-exclamation-circle mt-1 ml-2"></i>
+                                <span>عملکرد ضعیف در معاملات USD/CAD</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-exclamation-circle mt-1 ml-2"></i>
+                                <span>استراتژی الگوی هارمونیک با 42% موفقیت</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-exclamation-circle mt-1 ml-2"></i>
+                                <span>واکنش به ضررهای متوالی</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-exclamation-circle mt-1 ml-2"></i>
+                                <span>معاملات در ساعات 20:00 تا 22:00</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Specific Recommendations -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold mb-4">توصیه‌های تخصصی برای بهبود</h3>
+                    
+                    <div class="space-y-4">
+                        <!-- Recommendation 1 -->
+                        <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                            <div class="flex items-start">
+                                <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-500 ml-3 mt-1">
+                                    <i class="fas fa-calendar-alt"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">بهینه‌سازی زمان معاملات</h4>
+                                    <p class="text-gray-600 mb-3">تحلیل‌ها نشان می‌دهد که عملکرد شما در ساعات خاصی از روز بهتر است.</p>
+                                    <div class="bg-blue-50 p-3 rounded-lg">
+                                        <h5 class="text-blue-800 font-medium mb-2">اقدامات پیشنهادی:</h5>
+                                        <ul class="list-disc list-inside text-sm text-blue-700 space-y-1">
+                                            <li>تمرکز اصلی معاملات خود را روی ساعات 10:00 تا 12:00 و 14:00 تا 16:00 قرار دهید.</li>
+                                            <li>از معامله در ساعات 20:00 تا 22:00 که بدترین عملکرد را داشته‌اید، خودداری کنید.</li>
+                                            <li>قبل از معامله در ساعات پرنوسان بازار (زمان باز شدن بازار نیویورک)، استراتژی محافظه‌کارانه‌تری اتخاذ کنید.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Recommendation 2 -->
+                        <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                            <div class="flex items-start">
+                                <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-100 text-green-500 ml-3 mt-1">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">بهبود مدیریت ریسک</h4>
+                                    <p class="text-gray-600 mb-3">نسبت ریسک به پاداش فعلی شما 1:2.3 است که می‌تواند بهبود یابد.</p>
+                                    <div class="bg-green-50 p-3 rounded-lg">
+                                        <h5 class="text-green-800 font-medium mb-2">اقدامات پیشنهادی:</h5>
+                                        <ul class="list-disc list-inside text-sm text-green-700 space-y-1">
+                                            <li>هدف خود را برای رسیدن به نسبت ریسک به پاداش 1:3 تنظیم کنید.</li>
+                                            <li>اهداف سود خود را دورتر و حد ضرر را نزدیک‌تر قرار ندهید، بلکه با تحلیل دقیق‌تر، نقاط ورود بهتری انتخاب کنید.</li>
+                                            <li>از قانون 2% استفاده کنید - هرگز بیش از 2% از سرمایه خود را در یک معامله ریسک نکنید.</li>
+                                            <li>پس از 2 معامله ضررده متوالی، حجم معاملات را به نصف کاهش دهید.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Recommendation 3 -->
+                        <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                            <div class="flex items-start">
+                                <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-purple-100 text-purple-500 ml-3 mt-1">
+                                    <i class="fas fa-lightbulb"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">تمرکز بر استراتژی‌های موفق</h4>
+                                    <p class="text-gray-600 mb-3">برخی استراتژی‌های شما به طور قابل توجهی موفق‌تر از بقیه هستند.</p>
+                                    <div class="bg-purple-50 p-3 rounded-lg">
+                                        <h5 class="text-purple-800 font-medium mb-2">اقدامات پیشنهادی:</h5>
+                                        <ul class="list-disc list-inside text-sm text-purple-700 space-y-1">
+                                            <li>بر استراتژی «شکست خط روند» و «واگرایی RSI» که بهترین عملکرد را داشته‌اند، تمرکز کنید.</li>
+                                            <li>استراتژی «الگوی هارمونیک» را بازنگری کنید یا با حجم کمتری از آن استفاده کنید.</li>
+                                            <li>معیارهای دقیق‌تری برای ورود به معاملات با استراتژی‌های ضعیف‌تر تعیین کنید.</li>
+                                            <li>یک روزنگار آموزشی ایجاد کنید و دلایل موفقیت و شکست هر استراتژی را ثبت کنید.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Recommendation 4 -->
+                        <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                            <div class="flex items-start">
+                                <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-500 ml-3 mt-1">
+                                    <i class="fas fa-chart-pie"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">تنوع‌بخشی جفت ارزها</h4>
+                                    <p class="text-gray-600 mb-3">عملکرد شما در برخی جفت ارزها بسیار بهتر از بقیه است.</p>
+                                    <div class="bg-red-50 p-3 rounded-lg">
+                                        <h5 class="text-red-800 font-medium mb-2">اقدامات پیشنهادی:</h5>
+                                        <ul class="list-disc list-inside text-sm text-red-700 space-y-1">
+                                            <li>حجم بیشتری از سرمایه خود را به معاملات EUR/USD و GBP/JPY که بهترین عملکرد را داشته‌اند، اختصاص دهید.</li>
+                                            <li>معاملات USD/CAD را متوقف کنید یا تنها با حجم بسیار کم به عنوان آزمایش انجام دهید.</li>
+                                            <li>هر هفته حداقل 70% معاملات خود را روی 3 جفت ارز برتر متمرکز کنید.</li>
+                                            <li>به جای گسترش معاملات در همه جفت ارزها، تخصص خود را در چند جفت ارز خاص افزایش دهید.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Recommendation 5 -->
+                        <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                            <div class="flex items-start">
+                                <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-yellow-100 text-yellow-500 ml-3 mt-1">
+                                    <i class="fas fa-brain"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">بهبود روانشناسی معاملات</h4>
+                                    <p class="text-gray-600 mb-3">واکنش شما به ضررها می‌تواند بهبود یابد.</p>
+                                    <div class="bg-yellow-50 p-3 rounded-lg">
+                                        <h5 class="text-yellow-800 font-medium mb-2">اقدامات پیشنهادی:</h5>
+                                        <ul class="list-disc list-inside text-sm text-yellow-700 space-y-1">
+                                            <li>پس از هر ضرر بزرگ، 2 ساعت استراحت کنید و سپس تصمیم به ادامه معامله بگیرید.</li>
+                                            <li>یک روزنگار احساسی ایجاد کنید و وضعیت روحی خود را قبل و بعد از هر معامله ثبت کنید.</li>
+                                            <li>قوانین سختگیرانه‌ای برای خود تعیین کنید و حتی در شرایط احساسی به آنها پایبند باشید.</li>
+                                            <li>تکنیک‌های مدیریت استرس مانند تنفس عمیق یا مدیتیشن کوتاه را بین معاملات تمرین کنید.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Action Plan -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">برنامه عملیاتی پیشنهادی</h3>
+                    
+                    <div class="p-5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+                        <h4 class="font-semibold text-blue-800 mb-4">گام‌های بعدی برای بهبود نتایج معاملاتی</h4>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <h5 class="font-medium text-gray-800 mb-2">هفته آینده:</h5>
+                                <ul class="list-decimal list-inside text-gray-600 space-y-1">
+                                    <li>بازنگری تمام معاملات USD/CAD گذشته و شناسایی الگوهای شکست</li>
+                                    <li>تنظیم برنامه معاملاتی با تمرکز بر ساعات 10-12 و 14-16</li>
+                                    <li>افزایش نسبت ریسک به پاداش به حداقل 1:2.5 برای همه معاملات</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="font-medium text-gray-800 mb-2">ماه آینده:</h5>
+                                <ul class="list-decimal list-inside text-gray-600 space-y-1">
+                                    <li>تمرکز 70% معاملات روی EUR/USD، GBP/JPY و AUD/USD</li>
+                                    <li>کاهش استفاده از استراتژی الگوی هارمونیک یا بازنگری آن</li>
+                                    <li>ثبت و تحلیل واکنش‌های احساسی به معاملات ضررده</li>
+                                    <li>رسیدن به متوسط نسبت ریسک به پاداش 1:3</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="font-medium text-gray-800 mb-2">سه ماه آینده:</h5>
+                                <ul class="list-decimal list-inside text-gray-600 space-y-1">
+                                    <li>افزایش نرخ موفقیت به 68% (از 63% فعلی)</li>
+                                    <li>بهبود مدیریت ریسک و رسیدن به حداکثر 2 ضرر متوالی</li>
+                                    <li>افزایش میانگین سود هر معامله به $45 (از $35.42 فعلی)</li>
+                                    <li>ایجاد یک چارچوب معاملاتی منضبط براساس زمان، جفت ارز و استراتژی</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6">
+                            <button class="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-300 flex items-center justify-center">
+                                <i class="fas fa-file-download ml-2"></i>
+                                دانلود برنامه عملیاتی کامل
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Settings Section -->
+        <section id="tab-settings" class="tab-content hidden">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Account Settings -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-bold mb-4">تنظیمات حساب</h2>
+                    
+                    <form class="space-y-4">
+                        <div>
+                            <label class="block text-gray-700 mb-2">نام کاربری</label>
+                            <input type="text" value="trader_pro" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 mb-2">ایمیل</label>
+                            <input type="email" value="trader@example.com" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 mb-2">رمز عبور</label>
+                            <input type="password" value="********" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 mb-2">زبان</label>
+                            <select class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option selected>فارسی</option>
+                                <option>English</option>
+                                <option>العربية</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 mb-2">منطقه زمانی</label>
+                            <select class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option selected>تهران (GMT+3:30)</option>
+                                <option>London (GMT+0)</option>
+                                <option>New York (GMT-5)</option>
+                                <option>Tokyo (GMT+9)</option>
+                            </select>
+                        </div>
+                        
+                        <button type="button" class="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-300">
+                            ذخیره تغییرات
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- System Settings -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-bold mb-4">تنظیمات سیستم</h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-gray-700 mb-2">ارز پیش‌فرض</label>
+                            <select class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option selected>دلار آمریکا (USD)</option>
+                                <option>یورو (EUR)</option>
+                                <option>پوند (GBP)</option>
+                                <option>ین ژاپن (JPY)</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 mb-2">سرمایه کل حساب</label>
+                            <input type="text" value="10,000" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="flex justify-between text-gray-700 mb-2">
+                                <span>به‌روزرسانی خودکار داشبورد</span>
+                                <span class="text-blue-500 text-sm">هر 5 دقیقه</span>
+                            </label>
+                            <div class="flex items-center">
+                                <input type="range" min="0" max="60" value="5" step="5" class="w-full h-2 bg-blue-100 rounded-lg appearance-none cursor-pointer">
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="text-gray-700">نوتیفیکیشن‌های سیستم</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" value="" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="text-gray-700">نوتیفیکیشن‌های ایمیل</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" value="" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="text-gray-700">ذخیره خودکار داده‌ها</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" value="" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                        
+                        <button type="button" class="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-300">
+                            ذخیره تنظیمات
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Broker Connections & Data Management -->
+                <div>
+                    <!-- Broker Connections -->
+                    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                        <h2 class="text-xl font-bold mb-4">اتصالات بروکر</h2>
+                        
+                        <div class="space-y-3">
+                            <div class="p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <img src="https://cdn.jsdelivr.net/gh/MetaQuotes/icons@master/mt4/icon.svg" alt="MetaTrader 4" class="w-8 h-8 ml-3">
+                                    <div>
+                                        <span class="block text-gray-700 font-medium">MetaTrader 4</span>
+                                        <span class="text-sm text-gray-500">حساب: 12345678</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2 space-x-reverse">
+                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">متصل</span>
+                                    <button class="text-gray-500 hover:text-gray-700">
+                                        <i class="fas fa-cog"></i>
+                                    </button>
+                                    <button class="text-red-500 hover:text-red-700">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <img src="https://cdn.jsdelivr.net/gh/MetaQuotes/icons@master/mt5/icon.svg" alt="MetaTrader 5" class="w-8 h-8 ml-3">
+                                    <div>
+                                        <span class="block text-gray-700 font-medium">MetaTrader 5</span>
+                                        <span class="text-sm text-gray-500">اتصال جدید</span>
+                                    </div>
+                                </div>
+                                <button class="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition duration-300 text-sm">
+                                    اتصال
+                                </button>
+                            </div>
+                            
+                            <div class="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <img src="https://cdn.jsdelivr.net/gh/spotware/cTrader-icons/ctrader.svg" alt="cTrader" class="w-8 h-8 ml-3">
+                                    <div>
+                                        <span class="block text-gray-700 font-medium">cTrader</span>
+                                        <span class="text-sm text-gray-500">اتصال جدید</span>
+                                    </div>
+                                </div>
+                                <button class="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition duration-300 text-sm">
+                                    اتصال
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <button type="button" class="w-full mt-4 py-2 px-4 border border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50 transition duration-300 flex items-center justify-center">
+                            <i class="fas fa-plus ml-2"></i>
+                            افزودن بروکر جدید
+                        </button>
+                    </div>
+                    
+                    <!-- Data Management -->
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h2 class="text-xl font-bold mb-4">مدیریت داده‌ها</h2>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <h3 class="text-gray-700 font-medium mb-3">وارد کردن/خروجی گرفتن داده‌ها</h3>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <button type="button" class="py-2 px-4 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition duration-300 flex items-center justify-center">
+                                        <i class="fas fa-file-import ml-2"></i>
+                                        وارد کردن
+                                    </button>
+                                    <button type="button" class="py-2 px-4 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition duration-300 flex items-center justify-center">
+                                        <i class="fas fa-file-export ml-2"></i>
+                                        خروجی گرفتن
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h3 class="text-gray-700 font-medium mb-3">پشتیبان‌گیری</h3>
+                                <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="text-gray-600">آخرین پشتیبان‌گیری:</span>
+                                        <span class="text-gray-800">1402/06/10 15:30</span>
+                                    </div>
+                                    <button type="button" class="w-full py-2 px-4 bg-green-600 text-white rounded hover:bg-green-700 transition duration-300 flex items-center justify-center">
+                                        <i class="fas fa-cloud-upload-alt ml-2"></i>
+                                        پشتیبان‌گیری جدید
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h3 class="text-gray-700 font-medium mb-3">پاکسازی داده‌ها</h3>
+                                <div class="space-y-2">
+                                    <button type="button" class="w-full py-2 px-4 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 transition duration-300 flex items-center justify-center">
+                                        <i class="fas fa-broom ml-2"></i>
+                                        پاکسازی داده‌های موقت
+                                    </button>
+                                    <button type="button" class="w-full py-2 px-4 bg-red-100 text-red-700 rounded hover:bg-red-200 transition duration-300 flex items-center justify-center">
+                                        <i class="fas fa-trash-alt ml-2"></i>
+                                        حذف تمام داده‌ها
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8 px-4">
+        <div class="container mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">سیستم آنالیز تریدهای فارکس</h3>
+                    <p class="text-gray-400">ابزاری قدرتمند برای بهبود عملکرد معاملاتی شما در بازار فارکس با آنالیز دقیق و ارائه پیشنهادات هوشمند.</p>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">لینک‌های مفید</h3>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white">راهنمای استفاده</a></li>
+                        <li><a href="#" class="hover:text-white">سؤالات متداول</a></li>
+                        <li><a href="#" class="hover:text-white">شرایط استفاده</a></li>
+                        <li><a href="#" class="hover:text-white">سیاست حریم خصوصی</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">تماس با ما</h3>
+                    <ul class="space-y-2 text-gray-400">
+                        <li class="flex items-center">
+                            <i class="fas fa-envelope ml-2"></i>
+                            <span>support@forexanalyzer.com</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-phone ml-2"></i>
+                            <span>021-12345678</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-map-marker-alt ml-2"></i>
+                            <span>تهران، خیابان ولیعصر</span>
+                        </li>
+                    </ul>
+                    <div class="flex space-x-4 space-x-reverse mt-4">
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-telegram text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-instagram text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-twitter text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-linkedin text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-700 mt-6 pt-6 text-center text-gray-400">
+                <p>&copy; 1402 سیستم آنالیز تریدهای فارکس. تمامی حقوق محفوظ است.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modal for Adding Trade -->
+    <div id="add-trade-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-screen overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold">افزودن معامله جدید</h3>
+                    <button id="close-add-trade-modal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="add-trade-form" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-gray-700 mb-2">جفت ارز</label>
+                            <select class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">انتخاب جفت ارز</option>
+                                <option>EUR/USD</option>
+                                <option>GBP/USD</option>
+                                <option>USD/JPY</option>
+                                <option>AUD/USD</option>
+                                <option>USD/CAD</option>
+                                <option>EUR/GBP</option>
+                                <option>USD/CHF</option>
+                                <option>NZD/USD</option>
+                                <option>EUR/JPY</option>
+                                <option>GBP/JPY</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 mb-2">نوع معامله</label>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-300">
+                                    <input type="radio" name="trade-type" id="buy" class="ml-2">
+                                    <label for="buy" class="flex items-center cursor-pointer">
+                                        <span class="inline-block w-4 h-4 rounded-full bg-green-500 ml-2"></span>
+                                        خرید (Buy)
+                                    </label>
+                                </div>
+                                <div class="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-300">
+                                    <input type="radio" name="trade-type" id="sell" class="ml-2">
+                                    <label for="sell" class="flex items-center cursor-pointer">
+                                        <span class="inline-block w-4 h-4 rounded-full bg-red-500 ml-2"></span>
+                                        فروش (Sell)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-gray-700 mb-2">تاریخ و زمان ورود</label>
+                            <input type="datetime-local" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 mb-2">قیمت ورود</label>
+                            <input type="number" step="0.00001" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 mb-2">حجم معامله (لات)</label>
+                            <input type="number" step="0.01" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-gray-700 mb-2">تاریخ و زمان خروج</label>
+                            <input type="datetime-local" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 mb-2">قیمت خروج</label>
+                            <input type="number" step="0.00001" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 mb-2">سود/ضرر (دلار)</label>
+                            <input type="number" step="0.01" readonly class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-700 mb-2">استراتژی معاملاتی</label>
+                        <select class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">انتخاب استراتژی</option>
+                            <option>شکست خط روند</option>
+                            <option>واگرایی RSI</option>
+                            <option>الگوی هارمونیک</option>
+                            <option>شکست خط حمایت/مقاومت</option>
+                            <option>میانگین متحرک</option>
+                            <option>الگوهای کندل استیک</option>
+                            <option>خبر اقتصادی</option>
+                            <option>سایر</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-700 mb-2">یادداشت‌ها</label>
+                        <textarea rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <input type="checkbox" id="add-screenshot" class="ml-2">
+                        <label for="add-screenshot">افزودن اسکرین‌شات</label>
+                    </div>
+                    
+                    <div id="screenshot-upload" class="hidden p-4 border border-dashed border-gray-300 rounded-lg text-center">
+                        <i class="fas fa-upload text-gray-400 text-3xl mb-2"></i>
+                        <p class="text-gray-500 mb-2">فایل تصویر را اینجا رها کنید یا کلیک کنید</p>
+                        <input type="file" accept="image/*" class="hidden" id="screenshot-input">
+                        <button type="button" id="browse-screenshot" class="py-2 px-4 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition duration-300">
+                            انتخاب فایل
+                        </button>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3 space-x-reverse">
+                        <button type="button" id="cancel-add-trade" class="py-2 px-6 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition duration-300">
+                            انصراف
+                        </button>
+                        <button type="submit" class="py-2 px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-300">
+                            ذخیره معامله
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript for the application -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tab switching functionality
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Remove active class from all tabs
+                    tabs.forEach(t => t.classList.remove('active'));
+                    // Add active class to clicked tab
+                    tab.classList.add('active');
+                    
+                    // Hide all tab contents
+                    tabContents.forEach(content => content.classList.add('hidden'));
+                    // Show the selected tab content
+                    const tabId = 'tab-' + tab.dataset.tab;
+                    document.getElementById(tabId).classList.remove('hidden');
+                });
+            });
+            
+            // Connect broker button functionality
+            const connectButton = document.getElementById('connect-broker');
+            const connectionStatus = document.getElementById('connection-status');
+            
+            connectButton.addEventListener('click', () => {
+                const brokerName = document.getElementById('broker-name').value;
+                const accountNumber = document.getElementById('account-number').value;
+                const investorPassword = document.getElementById('investor-password').value;
+                
+                if (brokerName && accountNumber && investorPassword) {
+                    // Simulate connection process
+                    connectButton.textContent = 'در حال اتصال...';
+                    connectButton.disabled = true;
+                    
+                    setTimeout(() => {
+                        connectionStatus.classList.remove('bg-red-500');
+                        connectionStatus.classList.add('bg-green-500');
+                        connectionStatus.innerHTML = '<i class="fas fa-plug ml-2"></i><span>متصل</span>';
+                        
+                        connectButton.textContent = 'اتصال برقرار شد';
+                        connectButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                        connectButton.classList.add('bg-green-600', 'hover:bg-green-700');
+                        
+                        // Show alert
+                        alert('اتصال به بروکر با موفقیت برقرار شد. داده‌های معاملاتی در حال بارگذاری است.');
+                        
+                        // Enable button after a delay
+                        setTimeout(() => {
+                            connectButton.textContent = 'اتصال به بروکر';
+                            connectButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+                            connectButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                            connectButton.disabled = false;
+                        }, 5000);
+                    }, 2000);
+                } else {
+                    alert('لطفاً تمام اطلاعات مورد نیاز را وارد کنید.');
+                }
+            });
+            
+            // Add Trade Modal functionality
+            const addTradeBtn = document.getElementById('add-manual-trade');
+            const addTradeModal = document.getElementById('add-trade-modal');
+            const closeAddTradeBtn = document.getElementById('close-add-trade-modal');
+            const cancelAddTradeBtn = document.getElementById('cancel-add-trade');
+            
+            addTradeBtn.addEventListener('click', () => {
+                addTradeModal.classList.remove('hidden');
+            });
+            
+            closeAddTradeBtn.addEventListener('click', () => {
+                addTradeModal.classList.add('hidden');
+            });
+            
+            cancelAddTradeBtn.addEventListener('click', () => {
+                addTradeModal.classList.add('hidden');
+            });
+            
+            // Add Screenshot functionality
+            const addScreenshotCheckbox = document.getElementById('add-screenshot');
+            const screenshotUpload = document.getElementById('screenshot-upload');
+            const browseScreenshotBtn = document.getElementById('browse-screenshot');
+            const screenshotInput = document.getElementById('screenshot-input');
+            
+            addScreenshotCheckbox.addEventListener('change', () => {
+                if (addScreenshotCheckbox.checked) {
+                    screenshotUpload.classList.remove('hidden');
+                } else {
+                    screenshotUpload.classList.add('hidden');
+                }
+            });
+            
+            browseScreenshotBtn.addEventListener('click', () => {
+                screenshotInput.click();
+            });
+            
+            // Initialize charts
+            function initCharts() {
+                // Profit Chart
+                const profitChartCtx = document.getElementById('profit-chart').getContext('2d');
+                const profitChart = new Chart(profitChartCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور'],
+                        datasets: [{
+                            label: 'سود/ضرر',
+                            data: [250, 520, 380, 720, 450, 680],
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+                
+                // Time Chart
+                const timeChartCtx = document.getElementById('time-chart').getContext('2d');
+                const timeChart = new Chart(timeChartCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['8-10', '10-12', '12-14', '14-16', '16-18', '18-20', '20-22'],
+                        datasets: [{
+                            label: 'سود ($)',
+                            data: [45, 85, 35, 65, 40, 25, -30],
+                            backgroundColor: function(context) {
+                                const value = context.dataset.data[context.dataIndex];
+                                return value < 0 ? 'rgba(239, 68, 68, 0.7)' : 'rgba(16, 185, 129, 0.7)';
+                            }
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+                
+                // Currency Chart
+                const currencyChartCtx = document.getElementById('currency-chart').getContext('2d');
+                const currencyChart = new Chart(currencyChartCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['EUR/USD', 'GBP/JPY', 'USD/JPY', 'AUD/USD', 'EUR/GBP', 'سایر'],
+                        datasets: [{
+                            data: [35, 25, 15, 10, 8, 7],
+                            backgroundColor: [
+                                'rgba(59, 130, 246, 0.7)',
+                                'rgba(16, 185, 129, 0.7)',
+                                'rgba(245, 158, 11, 0.7)',
+                                'rgba(139, 92, 246, 0.7)',
+                                'rgba(236, 72, 153, 0.7)',
+                                'rgba(107, 114, 128, 0.7)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+                
+                // Strategy Chart
+                const strategyChartCtx = document.getElementById('strategy-chart').getContext('2d');
+                const strategyChart = new Chart(strategyChartCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['شکست خط روند', 'واگرایی RSI', 'حمایت/مقاومت', 'الگوی هارمونیک', 'میانگین متحرک', 'سایر'],
+                        datasets: [{
+                            data: [30, 22, 18, 12, 10, 8],
+                            backgroundColor: [
+                                'rgba(59, 130, 246, 0.7)',
+                                'rgba(16, 185, 129, 0.7)',
+                                'rgba(245, 158, 11, 0.7)',
+                                'rgba(139, 92, 246, 0.7)',
+                                'rgba(236, 72, 153, 0.7)',
+                                'rgba(107, 114, 128, 0.7)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+                
+                // Best Hours Chart
+                if (document.getElementById('best-hours-chart')) {
+                    const bestHoursChartCtx = document.getElementById('best-hours-chart').getContext('2d');
+                    const bestHoursChart = new Chart(bestHoursChartCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['8-10', '10-12', '12-14', '14-16', '16-18', '18-20', '20-22'],
+                            datasets: [{
+                                label: 'نرخ موفقیت (%)',
+                                data: [58, 76, 62, 72, 55, 42, 35],
+                                backgroundColor: function(context) {
+                                    const value = context.dataset.data[context.dataIndex];
+                                    return value > 65 ? 'rgba(16, 185, 129, 0.7)' : 
+                                           value > 50 ? 'rgba(245, 158, 11, 0.7)' : 'rgba(239, 68, 68, 0.7)';
+                                }
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 100
+                                }
+                            }
+                        }
+                    });
+                }
+                
+                // Initialize other charts if they exist
+                const chartIds = [
+                    'weekday-chart', 'strategy-performance-chart', 'entry-methods-chart',
+                    'currency
